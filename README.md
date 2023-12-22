@@ -29,7 +29,6 @@ Upon completion of a feature please open a pull request and add those who you wo
 Some additional resources:
 
 - **Meeting notes**: [Google Docs Link](https://docs.google.com/document/d/14ANfxa0CUgF6XR9H8Xx3c1zYaqNO5UxUAivhAaCX-ww/edit?usp=sharing)
-- **Figma file**: [Figma Link](https://www.figma.com/file/o1aa3g3c8wKzJ0wgPhDmoe/Venture-Build-Design-Delivery?type=design&node-id=0-1&mode=design&t=afHZOu4M6Cui13YX-0)
 
 ## Background
 
