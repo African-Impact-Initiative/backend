@@ -1,0 +1,7 @@
+{
+    "client_secret": "aLc4h570xbscejD3ZMxVOayu9juZ0q1I4dBIxgNDc6E1WE6Ww5TzNcmPm4nTw06l3gPq9aZel1lKcpmTGfjJtr0SGweX0PwaHHNztBOZ9ftgQLDPbWVQxSxNvcEbidVQ",
+    "client_id": "DJWi4Xyg4iMuxGsrn3gboZqTT3Zxi1xANi5UICif",
+    "grant_type": "password",
+    "username": "saad.makrod@gmail.com",
+    "password": "password123!"
+}
