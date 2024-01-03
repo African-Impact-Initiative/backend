@@ -68,7 +68,7 @@ class UserManager(BaseUserManager):
         # only set staff and admin to true
         user.staff = True
         user.admin = True
-        user.term_of_use = True
+        user.terms_of_use = True
         user.save(using=self._db)
         return user
 
@@ -98,7 +98,7 @@ class User(AbstractBaseUser):
     country = models.TextField(null=True, blank=True)
     bio = models.CharField(null=True, blank=True, max_length=300)
     leadership = models.BooleanField(default=False)
-    team = TaggableManager()
+    team = TaggableManager(blank=True)
 
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, blank=True, null=True, default=None)
 
