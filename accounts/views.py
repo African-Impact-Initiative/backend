@@ -359,7 +359,7 @@ class AddOrganizationToUser(UserMixin, generics.UpdateAPIView):
 
                 return Response(response)
 
-            user.organizations.add(o)
+            user.organization = o
             user.save()
 
             response = {
