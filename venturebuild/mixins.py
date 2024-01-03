@@ -1,6 +1,6 @@
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
-from .permissions import IsAdminUserOrReadOnly, IsStaffUser
+from .permissions import IsAdminUserOrReadOnly, IsStaffUser, IsOwner, IsOwnerOrReadOnly
 from .filters import FilterOrgsToUser, AdminOrSelfFilterBackend, AdminOrParentApprovedFilterBackend, SuperuserOrSelfFilterBackend, UserFilterBackend
 
 '''
@@ -22,6 +22,14 @@ class GetOrAdminMixin():
 
 class StaffOnlyMixin():
     permission_classes = [IsStaffUser]
+
+# Give this mixin to only allow access to owner
+class OwnerOnlyMixin():
+    permission_classes = [IsOwner]
+
+# Give this mixin to only modification to owner
+class OwnerOrReadOnlyMixin():
+    permission_classes = [IsOwnerOrReadOnly]
 
 # Give this mixin to resources and it will show users approved resources
 # Admin will see all resources
