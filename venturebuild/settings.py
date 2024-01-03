@@ -193,3 +193,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema'
 }
+
+# for accessing uploaded images in development
+LOGOS_ROOT = BASE_DIR / 'logos'
+PHOTOS_ROOT = BASE_DIR / 'photos'

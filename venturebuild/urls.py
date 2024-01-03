@@ -19,6 +19,8 @@ from django.urls import path, include, re_path
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from .permissions import IsStaffUser
+from django.conf import settings
+from django.conf.urls.static import static
 
 schema_view = get_schema_view(
    openapi.Info(
@@ -42,3 +44,8 @@ urlpatterns = [
     path('api/accounts/', include('accounts.urls')),
     path('api/organizations/', include('organizations.urls')),
 ]
+
+# for accessing uploaded images in development
+if settings.DEBUG:
+    urlpatterns += static('/logos/', document_root=settings.LOGOS_ROOT)
+    urlpatterns += static('/photos/', document_root=settings.PHOTOS_ROOT)
