@@ -92,7 +92,7 @@ class User(AbstractBaseUser):
     joined = models.DateTimeField(auto_now_add=True) # used in cron job to check when to delete user account
 
     terms_of_use = models.BooleanField(default=False)
-    linkedin = models.URLField(blank=True, null=True, unique=True)
+    linkedin = models.URLField(blank=True, null=True)
     photo = models.ImageField(null=True, blank=True, upload_to=get_dir)
     role = models.TextField(null=True, blank=True)
     country = models.TextField(null=True, blank=True)
