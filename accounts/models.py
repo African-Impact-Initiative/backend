@@ -3,6 +3,7 @@ from django.db.models import Q
 from django.contrib.auth.models import BaseUserManager, AbstractBaseUser
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import fields
+from taggit.managers import TaggableManager
 
 from organizations.models import Organization
 # from django.dispatch import receiver
@@ -67,6 +68,7 @@ class UserManager(BaseUserManager):
         # only set staff and admin to true
         user.staff = True
         user.admin = True
+        user.term_of_use = True
         user.save(using=self._db)
         return user
 
@@ -82,6 +84,7 @@ class User(AbstractBaseUser):
     # for the 3 day period if they are not verified
     is_active = models.BooleanField(default=True)
     is_verified = models.BooleanField(default=False)    # used to verify user account
+    owner = models.BooleanField(default=False) # initialized to True for users who created their organization
     staff = models.BooleanField(default=False)
     admin = models.BooleanField(default=False)
     first_name = models.CharField(max_length=50)
@@ -94,8 +97,10 @@ class User(AbstractBaseUser):
     role = models.TextField(null=True, blank=True)
     country = models.TextField(null=True, blank=True)
     bio = models.CharField(null=True, blank=True, max_length=300)
+    leadership = models.BooleanField(default=False)
+    team = TaggableManager()
 
-    organizations = models.ManyToManyField(Organization, blank=True)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, blank=True, null=True, default=None)
 
     # Users email will be used as username
     USERNAME_FIELD = 'email'

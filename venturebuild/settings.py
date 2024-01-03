@@ -46,6 +46,8 @@ INSTALLED_APPS = [
     'social_django',                            # Used to implement Google OAuth
     'drf_social_oauth2',                        # Used to implement Google OAuth
     'drf_yasg',                                 # Swagger
+    'django_countries',
+    'taggit',
 
     #! APIs
     'accounts.apps.AccountsConfig',             # User API
