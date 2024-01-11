@@ -3,6 +3,7 @@ from django.db.models import Q
 from django.contrib.auth.models import BaseUserManager, AbstractBaseUser
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import fields
+from django_countries.fields import CountryField
 from taggit.managers import TaggableManager
 
 from organizations.models import Organization
@@ -95,7 +96,7 @@ class User(AbstractBaseUser):
     linkedin = models.URLField(blank=True, null=True)
     photo = models.ImageField(null=True, blank=True, upload_to=get_dir)
     role = models.TextField(null=True, blank=True)
-    country = models.TextField(null=True, blank=True)
+    country = CountryField(null=True, blank=True)
     bio = models.CharField(null=True, blank=True, max_length=300)
     leadership = models.BooleanField(default=False)
     team = TaggableManager(blank=True)
