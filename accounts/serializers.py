@@ -2,6 +2,8 @@ from rest_framework import serializers
 
 from django.core import exceptions
 import django.contrib.auth.password_validation as validators
+from django_countries.serializer_fields import CountryField
+from taggit.serializers import (TagListSerializerField, TaggitSerializer)
 
 from organizations.models import Organization
 
@@ -10,19 +12,28 @@ User = get_user_model()
 
 # Allow all fields except password
 #! Danger never allow a post or put to this serializer (anyone can modify staff or admin)
-class GetUserSerializer(serializers.ModelSerializer):
+class GetUserSerializer(TaggitSerializer, serializers.ModelSerializer):
+    team = TagListSerializerField()
+    country = CountryField(name_only=True, required=False, allow_null=True)
+
     class Meta:
         model = User
         exclude = ['password', 'is_verified']
 
 # Only allow id, email, name
-class UserPublicSerializer(serializers.ModelSerializer):
+class UserPublicSerializer(TaggitSerializer, serializers.ModelSerializer):
+    team = TagListSerializerField()
+    country = CountryField(name_only=True, required=False, allow_null=True)
+
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'email', 'linkedin', 'bio', 'photo', 'role', 'country']
+        fields = ['first_name', 'last_name', 'email', 'linkedin', 'bio', 'photo', 'role', 'country', 'leadership', 'team']
 
 #! Danger never allow GET on this serializer user can see password
-class UserSerializer(serializers.ModelSerializer):
+class UserSerializer(TaggitSerializer, serializers.ModelSerializer):
+    team = TagListSerializerField()
+    country = CountryField(name_only=True, required=False, allow_null=True)
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -141,7 +152,7 @@ class UpdatePersonalInfo(serializers.Serializer):
 
     linkedin = serializers.URLField(required=False)
     photo = Base64ImageField(required=False)
-    country = serializers.CharField(required=False)
+    country = CountryField(name_only=True, required=False, allow_null=True)
     bio = serializers.CharField(required=False)
 
 # Used to agree to terms

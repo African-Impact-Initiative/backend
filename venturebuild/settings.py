@@ -46,6 +46,8 @@ INSTALLED_APPS = [
     'social_django',                            # Used to implement Google OAuth
     'drf_social_oauth2',                        # Used to implement Google OAuth
     'drf_yasg',                                 # Swagger
+    'django_countries',
+    'taggit',
 
     #! APIs
     'accounts.apps.AccountsConfig',             # User API
@@ -191,3 +193,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema'
 }
+
+# for accessing uploaded images in development
+LOGOS_ROOT = BASE_DIR / 'logos'
+PHOTOS_ROOT = BASE_DIR / 'photos'
