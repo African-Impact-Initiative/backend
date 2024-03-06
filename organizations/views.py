@@ -1,6 +1,7 @@
 from rest_framework import generics
 
 from .models import Organization
+from django.db.models import Q
 from .serializers import OrganizationSerializer, AddChallengeSerializer, AddFundingSerializer, AddStageSerializer
 from venturebuild.mixins import PublicResourceMixin, UserMixin, OwnerOnlyMixin, OwnerOrReadOnlyMixin
 
@@ -20,7 +21,7 @@ class OrganizationListCreateAPIView(UserMixin, generics.ListCreateAPIView):
             user = User.objects.get(id=self.request.user.id)
         except User.DoesNotExist:
             return Response(status=status.HTTP_401_UNAUTHORIZED)
-                
+
         if not user.terms_of_use:
             # build this response
             response = {
@@ -36,6 +37,17 @@ class OrganizationListCreateAPIView(UserMixin, generics.ListCreateAPIView):
         user.organization = org
         user.owner = True
         user.save()
+
+    def filter_queryset(self, queryset):
+        query = self.request.query_params.get('organizations', None)
+
+        if query:
+            tags = query.split(' ')
+            name_match = Q(name__icontains=query) | Q(name__in=tags)
+            industries_match =  Q(industries__name__icontains=query) | Q(industries__name__in=tags)
+            return self.queryset.filter(name_match | industries_match).distinct()
+
+        return super().filter_queryset(queryset)
 
 class OrganizationViewUpdateDeleteAPIView(OwnerOrReadOnlyMixin, PublicResourceMixin, generics.RetrieveUpdateDestroyAPIView):
     queryset = Organization.objects.all()
