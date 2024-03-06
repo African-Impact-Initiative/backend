@@ -89,6 +89,8 @@ You can install all the packages by running `pip install -r requirements.txt`. 
 
 Make sure to create the migrations if necessary by navigating to the backend folder and running the commands: `python manage.py makemigrations` and then `python manage.py migrate`.
 
+**NOTE:** If at any point you run into an error along the lines of `'No module named pkg_resources'` you may need to install the `setuptools` package, so run `pip install setuptools`.
+
 To start the API run `python manage.py runserver` in the backend folder. If there are no issues the server will start at <http://127.0.0.1:8000/>.
 
 Now we must set up the **authentication backend**. Note that currently these steps specify the setup for user credentials (username and passwords); this will be updated when OAuth is implemented. To set up authentication perform the following steps:
