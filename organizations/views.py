@@ -39,13 +39,20 @@ class OrganizationListCreateAPIView(UserMixin, generics.ListCreateAPIView):
         user.save()
 
     def filter_queryset(self, queryset):
-        query = self.request.query_params.get('organizations', None)
+        org = self.request.query_params.get('organization', None)
+        industry = self.request.query_params.get('industry', None)
 
-        if query:
-            tags = query.split(' ')
-            name_match = Q(name__icontains=query) | Q(name__in=tags)
-            industries_match =  Q(industries__name__icontains=query) | Q(industries__name__in=tags)
-            return self.queryset.filter(name_match | industries_match).distinct()
+        if org or industry:
+            tags = org.split(' ')
+            query = None
+
+            if org:
+                query = Q(name__icontains=org) | Q(name__in=tags)
+            if industry:
+                industry_match = Q(industries__name__icontains=query)
+                query = industry_match if query is None else query | industry_match
+
+            return self.queryset.filter(query).distinct()
 
         return super().filter_queryset(queryset)
 
