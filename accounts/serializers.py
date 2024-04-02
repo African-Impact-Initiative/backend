@@ -150,10 +150,10 @@ class UpdatePersonalInfo(serializers.Serializer):
     last_name = serializers.CharField(required=True)
     role = serializers.CharField(required=True)
 
-    linkedin = serializers.URLField(required=False)
+    linkedin = serializers.URLField(required=False, allow_blank=True)
     photo = Base64ImageField(required=False)
     country = CountryField(name_only=True, required=False, allow_null=True)
-    bio = serializers.CharField(required=False)
+    bio = serializers.CharField(required=False, allow_blank=True)
 
 # Used to agree to terms
 class TermsOfUseAgreement(serializers.Serializer):
