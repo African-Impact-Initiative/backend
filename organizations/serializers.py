@@ -5,7 +5,7 @@ from django_countries.serializer_fields import CountryField
 from taggit.serializers import (TagListSerializerField, TaggitSerializer)
 
 class OrganizationSerializer(TaggitSerializer, serializers.ModelSerializer):
-    industries = TagListSerializerField()
+    industries = TagListSerializerField(required=False)
     location = CountryField(name_only=True, required=False, allow_null=True)
 
     user_set = UserPublicSerializer(many=True, read_only=True)

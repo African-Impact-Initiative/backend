@@ -19,7 +19,7 @@ class FilterOrgsToUser(filters.BaseFilterBackend):
         except User.DoesNotExist:
             return Organization.objects.none()
 
-        return queryset if user.is_staff else queryset.filter(id__in=[org.id for org in list(user.organizations.all())])
+        return queryset if user.is_staff else queryset.filter(id=user.organization.id)
 
 # Returns only approved items if user is not an admin
 class AdminOrApprovedFilterBackend(filters.BaseFilterBackend):

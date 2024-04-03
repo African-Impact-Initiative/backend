@@ -13,7 +13,7 @@ User = get_user_model()
 # Allow all fields except password
 #! Danger never allow a post or put to this serializer (anyone can modify staff or admin)
 class GetUserSerializer(TaggitSerializer, serializers.ModelSerializer):
-    team = TagListSerializerField()
+    team = TagListSerializerField(required=False)
     country = CountryField(name_only=True, required=False, allow_null=True)
 
     class Meta:
@@ -22,7 +22,7 @@ class GetUserSerializer(TaggitSerializer, serializers.ModelSerializer):
 
 # Only allow id, email, name
 class UserPublicSerializer(TaggitSerializer, serializers.ModelSerializer):
-    team = TagListSerializerField()
+    team = TagListSerializerField(required=False)
     country = CountryField(name_only=True, required=False, allow_null=True)
 
     class Meta:
@@ -31,7 +31,7 @@ class UserPublicSerializer(TaggitSerializer, serializers.ModelSerializer):
 
 #! Danger never allow GET on this serializer user can see password
 class UserSerializer(TaggitSerializer, serializers.ModelSerializer):
-    team = TagListSerializerField()
+    team = TagListSerializerField(required=False)
     country = CountryField(name_only=True, required=False, allow_null=True)
 
     def __init__(self, *args, **kwargs):
@@ -150,10 +150,10 @@ class UpdatePersonalInfo(serializers.Serializer):
     last_name = serializers.CharField(required=True)
     role = serializers.CharField(required=True)
 
-    linkedin = serializers.URLField(required=False)
+    linkedin = serializers.URLField(required=False, allow_blank=True)
     photo = Base64ImageField(required=False)
     country = CountryField(name_only=True, required=False, allow_null=True)
-    bio = serializers.CharField(required=False)
+    bio = serializers.CharField(required=False, allow_blank=True)
 
 # Used to agree to terms
 class TermsOfUseAgreement(serializers.Serializer):
