@@ -43,13 +43,12 @@ class OrganizationListCreateAPIView(UserMixin, generics.ListCreateAPIView):
         industry = self.request.query_params.get('industry', None)
 
         if org or industry:
-            tags = org.split(' ')
             query = None
 
             if org:
-                query = Q(name__icontains=org) | Q(name__in=tags)
+                query = Q(name__icontains=org) | Q(name__in=org.split(' '))
             if industry:
-                industry_match = Q(industries__name__icontains=query)
+                industry_match = Q(industries__name__icontains=industry)
                 query = industry_match if query is None else query | industry_match
 
             return self.queryset.filter(query).distinct()
