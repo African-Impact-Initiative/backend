@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import OrganizationListCreateAPIView, OrganizationViewUpdateDeleteAPIView, ChallengeUpdate, StageUpdate, FundingUpdate, OrganizationByIdentifierView
+from .views import OrganizationListCreateAPIView, OrganizationViewUpdateDeleteAPIView, ChallengeUpdate, StageUpdate, FundingUpdate, OrganizationByIdentifierView, UploadLogo
 
 urlpatterns = [
     path('', OrganizationListCreateAPIView.as_view(), name='organization-list'),
@@ -9,4 +9,5 @@ urlpatterns = [
     path('funding/<identifier>/', FundingUpdate.as_view(), name='funding-update'),
     path('stages/<identifier>/', StageUpdate.as_view(), name='stage-update'),
     path('identifier/<identifier>/', OrganizationByIdentifierView.as_view(), name='find-by-id'),
+    path('upload-logo/<int:pk>/', UploadLogo.as_view(), name='upload-logo'),
 ]
