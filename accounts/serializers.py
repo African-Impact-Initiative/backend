@@ -23,11 +23,10 @@ class GetUserSerializer(TaggitSerializer, serializers.ModelSerializer):
 # Only allow id, email, name
 class UserPublicSerializer(TaggitSerializer, serializers.ModelSerializer):
     team = TagListSerializerField(required=False)
-    country = CountryField(name_only=True, required=False, allow_null=True)
 
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'email', 'linkedin', 'bio', 'photo', 'role', 'country', 'leadership', 'team']
+        fields = ['id', 'first_name', 'last_name', 'email', 'photo', 'role', 'leadership', 'team']
 
 #! Danger never allow GET on this serializer user can see password
 class UserSerializer(TaggitSerializer, serializers.ModelSerializer):
