@@ -1,13 +1,12 @@
 from rest_framework import serializers
 from .models import Organization
-from accounts.serializers import Base64ImageField, UserPublicSerializer
+from accounts.serializers import UserPublicSerializer
 from django_countries.serializer_fields import CountryField
 from taggit.serializers import (TagListSerializerField, TaggitSerializer)
 
 class OrganizationSerializer(TaggitSerializer, serializers.ModelSerializer):
     industries = TagListSerializerField(required=False)
     location = CountryField(name_only=True, required=False, allow_null=True)
-    logo = Base64ImageField(required=False)
 
     user_set = UserPublicSerializer(many=True, read_only=True)
 
