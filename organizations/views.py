@@ -59,6 +59,21 @@ class OrganizationViewUpdateDeleteAPIView(OwnerOrReadOnlyMixin, PublicResourceMi
     queryset = Organization.objects.all()
     serializer_class = OrganizationSerializer
 
+class UploadLogo(OwnerOrReadOnlyMixin, PublicResourceMixin, generics.UpdateAPIView):
+    queryset = Organization.objects.all()
+    serializer_class = OrganizationSerializer
+
+    def post(self, request, *args, **kwargs):
+        org = self.get_object()
+        logo_file = request.FILES.get('logo')
+        if logo_file:
+            org.logo = logo_file
+            org.save()
+            serializer = self.get_serializer(org)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response(message='Logo file not provided', status=status.HTTP_400_BAD_REQUEST)
+
 class OrganizationByIdentifierView(UserMixin, PublicResourceMixin, generics.RetrieveAPIView):
     queryset = Organization.objects.all()
     serializer_class = OrganizationSerializer
