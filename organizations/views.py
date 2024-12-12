@@ -1,5 +1,5 @@
 from rest_framework import generics
-
+from accounts.serializers import UserPublicSerializer
 from .models import Organization
 from django.db.models import Q
 from .serializers import OrganizationSerializer, AddChallengeSerializer, AddFundingSerializer, AddStageSerializer
@@ -154,14 +154,13 @@ class ChallengeUpdate(OwnerOnlyMixin, generics.UpdateAPIView):
 
     def update(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-
+        print(request.data)
         if serializer.is_valid():
             c1 = serializer.data.get("challenge1", False)
             c2 = serializer.data.get("challenge2", False)
             c3 = serializer.data.get("challenge3", False)
             if c1 or c2 or c3:
                 org = self.get_object()
-
                 if c1:
                     org.challenge1 = serializer.data.get("challenge1")
                     org.save()
@@ -191,3 +190,53 @@ class ChallengeUpdate(OwnerOnlyMixin, generics.UpdateAPIView):
             return Response(response)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class OrganizationMembersView(generics.ListAPIView):
+    serializer_class = UserPublicSerializer
+
+    def get_queryset(self):
+        # Get the organization of the current user
+        organization_id = self.kwargs.get('organization_id')
+        if organization_id:
+            # Return all users belonging to this organization
+            return get_user_model().objects.all().filter(organization_id=organization_id)
+        return get_user_model().objects.none()
+
+
+class UpdateOrganizationMemberView(generics.UpdateAPIView):
+    serializer_class = UserPublicSerializer
+    
+    def get_object(self):
+        organization_id = self.kwargs.get('organization_id')
+        user_id = self.kwargs.get('user_id')
+        return get_user_model().objects.filter(
+            organization_id=organization_id,
+            id=user_id
+        )
+
+
+class UpdateMemberCoownerStatusView(OwnerOnlyMixin, generics.UpdateAPIView):
+    serializer_class = UserPublicSerializer
+    
+    def get_object(self):
+        organization_id = self.kwargs.get('organization_id')
+        user_id = self.kwargs.get('user_id')
+        return get_user_model().objects.get(
+            organization_id=organization_id,
+            id=user_id
+        )
+    
+    def update(self, request, *args, **kwargs):
+        user = self.get_object()
+        organization_id = self.kwargs.get('organization_id')
+        
+        if user.coowner == organization_id:
+            user.coowner = None
+        else:
+            user.coowner = organization_id
+            
+        user.save()
+        
+        serializer = self.get_serializer(user)
+        return Response(serializer.data, status=status.HTTP_200_OK)

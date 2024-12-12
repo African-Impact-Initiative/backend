@@ -1,7 +1,7 @@
 from django.core.mail import EmailMessage
 from django.template.loader import render_to_string
 from . import settings
-
+from django.core.mail import send_mail
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
@@ -170,3 +170,44 @@ def account_deleted(user):
     email.fail_silently = True
     email.content_subtype = "html"
     email.send()
+
+
+def send_invitation_email(email, organization_name, token):
+    """
+    Send an invitation email to join an organization
+    
+    Args:
+        email (str): Recipient's email address
+        organization_name (str): Name of the organization
+        token (str): Invitation token
+    """
+    # Create invitation link using token
+    email_subject = f"Invitation to join {organization_name} on Venture Build"
+    # Render the HTML template with context
+    message = render_to_string('venturebuild/invitation.html', {
+        'organization_name': organization_name,
+        'invitation_link': token,
+    })
+    receiver = [email]
+
+    send_mail(
+        email_subject,
+        message,
+        settings.EMAIL_HOST_USER,  # Use the authenticated email here
+        receiver,
+        html_message=message,
+        fail_silently=False,
+    )
+
+    # Create and send the email
+    # msg = EmailMessage(
+    #     subject=email_subject,
+    #     body=message,
+    #     from_email=settings.EMAIL_HOST_USER,
+    #     to=[email]
+    # )
+    # print("------")
+    # msg.content_subtype = "html"
+    # msg.fail_silently = False
+    # print("!!!!!")
+    # msg.send()

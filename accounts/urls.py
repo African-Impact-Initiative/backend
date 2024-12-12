@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import ChangeEmailView, GetAdmins, GetUser, UserListCreateAPIView, UserViewUpdateDeleteAPIView, ChangePasswordView, TermsOfUseUpdate, AddOrganizationToUser, PersonInfoUpdate
+from .views import ChangeEmailView, GetAdmins, GetUser, UserListCreateAPIView, UserViewUpdateDeleteAPIView, ChangePasswordView, TermsOfUseUpdate, AddOrganizationToUser, PersonInfoUpdate, UpdateTeamStatus, InvitationViewSet, ProcessInvitationView
 
 urlpatterns = [
     path('', UserListCreateAPIView.as_view(), name='user-list'),
@@ -12,5 +12,26 @@ urlpatterns = [
     path('onboarding/terms/', TermsOfUseUpdate.as_view(), name='terms'),
     path('onboarding/personal-info/', PersonInfoUpdate.as_view(), name='personal-info'),
     path('onboarding/add-organization/', AddOrganizationToUser.as_view(), name='add-organization'),
+    path('users/team-status/', UpdateTeamStatus.as_view(), name='update-team-status'),
     # path('activate/<slug:uidb64>/<slug:token>/', activate, name='activate'),
+    # Invitation URLs
+    path('invitations/', InvitationViewSet.as_view({
+        'get': 'list',
+        'post': 'create'
+    }), name='invitation-list'),
+    
+    # URL for processing invitations using token
+    path('invitations/process/<str:token>/', 
+         ProcessInvitationView.as_view(), 
+         name='process-invitation'),
+    path('invitations/<int:pk>/', InvitationViewSet.as_view({
+        'get': 'retrieve',
+        'put': 'update',
+        'patch': 'partial_update',
+        'delete': 'destroy'
+    })),
+    path('invitations/<int:pk>/accept/', InvitationViewSet.as_view({'post': 'accept'})),
+    path('invitations/<int:pk>/decline/', InvitationViewSet.as_view({'post': 'decline'})),
+    path('invitations/<int:pk>/withdraw/', InvitationViewSet.as_view({'post': 'withdraw'})),
+    path('invitations/<int:pk>/resend/', InvitationViewSet.as_view({'post': 'resend'})),
 ]

@@ -74,6 +74,7 @@ AUTHENTICATION_BACKENDS = (
 
     # Django
     'django.contrib.auth.backends.ModelBackend',
+    
 )
 
 ACTIVATE_JWT = True
@@ -113,7 +114,7 @@ else:
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / 'venturebuild' / 'templates'],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -197,3 +198,13 @@ REST_FRAMEWORK = {
 # for accessing uploaded images in development
 LOGOS_ROOT = BASE_DIR / 'logos'
 PHOTOS_ROOT = BASE_DIR / 'photos'
+
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_USE_TLS = True
+EMAIL_USE_SSL = False
+EMAIL_PORT = 587
+EMAIL_HOST_USER = 'testafricanteam@gmail.com'  
+EMAIL_HOST_PASSWORD = 'hvuw gayp emik sdwj'  
+FRONTEND_URL = 'http://localhost:3000'
