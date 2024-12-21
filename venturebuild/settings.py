@@ -26,9 +26,6 @@ SECRET_KEY = "django-insecure-ws5bdbb0oyh#-(r4&sbw#!c+ephe2n^a5ws53mc7i%molu6peg
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
-
 # Application definition
 
 INSTALLED_APPS = [
@@ -105,6 +102,12 @@ if DEBUG:
         'https://127.0.0.1:3000',
         'http://127.0.0.1:8000'
     ]
+    SESSION_COOKIE_SAMESITE = 'None'  # Required for cross-domain cookies
+    SESSION_COOKIE_SECURE = False
+    SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+    CORS_ALLOW_CREDENTIALS = True
+    CSRF_COOKIE_SAMESITE = 'None'
+    CSRF_COOKIE_SECURE = False
 else:
     CORS_ALLOWED_ORIGINS += [
         'http://127.0.0.1:8000'
@@ -113,7 +116,7 @@ else:
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": ['venturebuild/templates/venturebuild',],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -197,3 +200,10 @@ REST_FRAMEWORK = {
 # for accessing uploaded images in development
 LOGOS_ROOT = BASE_DIR / 'logos'
 PHOTOS_ROOT = BASE_DIR / 'photos'
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'soccerblue20@gmail.com'
+EMAIL_HOST_PASSWORD = 'xfue qfvy zhkd voxo'

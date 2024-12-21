@@ -3,25 +3,33 @@ from rest_framework.response import Response
 from django.contrib.contenttypes.models import ContentType
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth import login as login
+from django.http import HttpResponseRedirect
+from django.conf import settings
 
 import json
 import os
 
-from .serializers import ChangeEmailSerializer, UserSerializer, GetUserSerializer, ChangePasswordSerializer, UpdatePersonalInfo, AddOrganization, TermsOfUseAgreement
-# from .tokens import account_activation_token
+from .serializers import ChangeEmailSerializer, UserSerializer, GetUserSerializer, ChangePasswordSerializer, \
+    UpdatePersonalInfo, AddOrganization, TermsOfUseAgreement
+from .tokens import account_activation_token
 from venturebuild.mixins import UserMixin, SuperuserOrSelfMixin, AllowAll, StaffOnlyMixin
 
 from organizations.models import Organization
 
-# from venturebuild.email_server import promote, demote, change_password, account_deleted, change_email, welcome_email
+from venturebuild.email_server import promote, demote, change_password, account_deleted, change_email, welcome_email
 
 from django.contrib.auth import get_user_model
+
+from django.shortcuts import redirect
+
 User = get_user_model()
+
 
 # User general REST endpoint GET, POST
 class UserListCreateAPIView(AllowAll, UserMixin, generics.ListCreateAPIView):
     queryset = User.objects.all()
-    serializer_class = GetUserSerializer # Default class is the GET class
+    serializer_class = GetUserSerializer  # Default class is the GET class
 
     def perform_create(self, serializer):
         user = None
@@ -52,8 +60,10 @@ class UserListCreateAPIView(AllowAll, UserMixin, generics.ListCreateAPIView):
             )
 
         # account activation token
-        # token = account_activation_token.make_token(user)
+        token = account_activation_token.make_token(user)
         # welcome_email(user, f"{os.environ.get('FRONTEND_URL')}/activate/?id={user.id}&token={token}")
+        # For testing purposes
+        welcome_email(user, f"http://localhost:8000/api/accounts/activate/{user.id}/{token}")
 
     def create(self, request, *args, **kwargs):
         res = super().create(request, *args, **kwargs)
@@ -67,6 +77,7 @@ class UserListCreateAPIView(AllowAll, UserMixin, generics.ListCreateAPIView):
         if self.request.method == 'POST':
             return UserSerializer
         return GetUserSerializer
+
 
 # User REST /:id endpoint GET, PUT, DELETE
 class UserViewUpdateDeleteAPIView(UserMixin, SuperuserOrSelfMixin, generics.RetrieveUpdateDestroyAPIView):
@@ -84,20 +95,20 @@ class UserViewUpdateDeleteAPIView(UserMixin, SuperuserOrSelfMixin, generics.Retr
             staff = serializer.validated_data.get('staff', False)
             admin = serializer.validated_data.get('admin', False)
 
-            # # if admin status changed
-            # if admin != obj.admin:
-            #     sent = True
-            #     if admin:
-            #         promote(obj)
-            #     else:
-            #         demote(obj)
+            # if admin status changed
+            if admin != obj.admin:
+                sent = True
+                if admin:
+                    promote(obj)
+                else:
+                    demote(obj)
 
-            # # if staff status changed
-            # if staff != obj.staff and not sent:
-            #     if staff:
-            #         promote(obj)
-            #     else:
-            #         demote(obj)
+            # if staff status changed
+            if staff != obj.staff and not sent:
+                if staff:
+                    promote(obj)
+                else:
+                    demote(obj)
 
             # do not allow the admin to modify anything other that staff/admin status
             serializer.save(
@@ -118,7 +129,7 @@ class UserViewUpdateDeleteAPIView(UserMixin, SuperuserOrSelfMixin, generics.Retr
 
         if self.request.user.id == obj.id:
             # send email
-            # account_deleted(obj)
+            account_deleted(obj)
             return super().perform_destroy(instance)
 
     def destroy(self, request, *args, **kwargs):
@@ -129,7 +140,8 @@ class UserViewUpdateDeleteAPIView(UserMixin, SuperuserOrSelfMixin, generics.Retr
         if obj.has_usable_password() and not obj.check_password(request.data.get("password")):
             return Response({"password": ["Wrong password."]}, status=status.HTTP_400_BAD_REQUEST)
         if self.request.user.is_admin and self.request.user.id != obj.id:
-            return Response(status=status.HTTP_403_FORBIDDEN, data={'error': 'You cannot delete a user other than yourself'})
+            return Response(status=status.HTTP_403_FORBIDDEN,
+                            data={'error': 'You cannot delete a user other than yourself'})
         return super().destroy(request, *args, **kwargs)
 
     # Only allow PUT to the user serializer
@@ -137,6 +149,7 @@ class UserViewUpdateDeleteAPIView(UserMixin, SuperuserOrSelfMixin, generics.Retr
         if self.request.method == 'PUT':
             return UserSerializer
         return GetUserSerializer
+
 
 # on frontend it is tricky to find out who is logged in since admin can see multiple users (needed to promote/demote and site analytics)
 # to resolve this create /me endpoint which returns users associated with the token
@@ -148,6 +161,7 @@ class GetUser(UserMixin, generics.RetrieveAPIView):
     def get_serializer_class(self):
         return GetUserSerializer
 
+
 # returns all admins
 class GetAdmins(StaffOnlyMixin, generics.ListAPIView):
     def get_queryset(self):
@@ -155,6 +169,7 @@ class GetAdmins(StaffOnlyMixin, generics.ListAPIView):
 
     def get_serializer_class(self):
         return GetUserSerializer
+
 
 # used to change password
 class ChangePasswordView(UserMixin, generics.UpdateAPIView):
@@ -187,11 +202,12 @@ class ChangePasswordView(UserMixin, generics.UpdateAPIView):
             }
 
             # send email
-            # change_password(self.object)
+            change_password(self.object)
 
             return Response(response)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class ChangeEmailView(UserMixin, generics.UpdateAPIView):
     serializer_class = ChangeEmailSerializer
@@ -226,7 +242,7 @@ class ChangeEmailView(UserMixin, generics.UpdateAPIView):
                 }
 
                 # send email
-                # change_email(user)
+                change_email(user)
 
                 return Response(response)
 
@@ -293,6 +309,7 @@ class PersonInfoUpdate(UserMixin, generics.UpdateAPIView):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 class TermsOfUseUpdate(UserMixin, generics.UpdateAPIView):
     serializer_class = TermsOfUseAgreement
     model = User
@@ -331,6 +348,7 @@ class TermsOfUseUpdate(UserMixin, generics.UpdateAPIView):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 class AddOrganizationToUser(UserMixin, generics.UpdateAPIView):
     serializer_class = AddOrganization
     model = User
@@ -363,11 +381,11 @@ class AddOrganizationToUser(UserMixin, generics.UpdateAPIView):
             user.save()
 
             response = {
-                    'status': 'success',
-                    'code': status.HTTP_200_OK,
-                    'message': 'Organization added',
-                    'data': []
-                }
+                'status': 'success',
+                'code': status.HTTP_200_OK,
+                'message': 'Organization added',
+                'data': []
+            }
 
             return Response(response)
 
@@ -375,25 +393,28 @@ class AddOrganizationToUser(UserMixin, generics.UpdateAPIView):
 
 
 # for some reason need csrf exempt for the function idk why though CORS should have handled this
-# @csrf_exempt
-# def activate(request, uidb64, token):
-#     # get user
-#     try:
-#         user = User.objects.get(pk=uidb64)
-#     except(TypeError, ValueError, OverflowError, User.DoesNotExist):
-#         user = None
+@csrf_exempt
+def activate(request, uidb64, token):
+    # get user
+    try:
+        user = User.objects.get(pk=uidb64)
+    except(TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
 
-#     # verify user and token matches
-#     if user is not None and account_activation_token.check_token(user, token):
-#         user.is_active = True   # account is now active
-#         user.is_verified = True   # account is now active
-#         user.save()
+    # verify user and token matches
+    if user is not None and account_activation_token.check_token(user, token):
+        user.is_active = True  # account is now active
+        user.is_verified = True  # account is now active
+        user.save()
+        user.backend = 'django.contrib.auth.backends.ModelBackend'
 
-#         res = HttpResponse()
-#         res.status_code = 200
+        login(request, user)
+        print(f"Session data after login: {request.session}")
 
-#         return res
-#     else:
-#         res = HttpResponse()
-#         res.status_code = 400
-#         return res
+        # Redirect to the terms of use page after login
+        frontend_url = f'http://localhost:3000/onboarding/terms-of-use/'
+        return HttpResponseRedirect(frontend_url)
+    else:
+        res = HttpResponse()
+        res.status_code = 400
+        return res
