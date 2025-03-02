@@ -174,7 +174,12 @@ class UpdateTeamStatusSerializer(serializers.Serializer):
 
 
 class InvitationSerializer(serializers.ModelSerializer):
+    organization_name = serializers.CharField(source='organization.name', read_only=True)
+    invited_by_name = serializers.CharField(source='invited_by.get_full_name', read_only=True)
+    invited_by_email = serializers.CharField(source='invited_by.email', read_only=True)
     class Meta:
         model = Invitation
-        fields = ['id', 'email', 'organization', 'invited_by', 'status', 'created_at', 'token']
+        fields = ['id', 'email', 'organization', 'organization_name', 
+                 'invited_by', 'invited_by_name', 'invited_by_email',
+                 'status', 'created_at', 'token']
         read_only_fields = ['invited_by', 'status', 'created_at', 'token']
