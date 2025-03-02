@@ -471,11 +471,14 @@ class InvitationViewSet(viewsets.ModelViewSet):
             )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except Exception as e:
+            import traceback
+            print(traceback.format_exc())
             invitation.delete()
             return Response(
-                {"error": "Failed to send invitation email"},
+                {"error": f"Failed to send invitation email: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
 
     @action(detail=True, methods=['post'])
     def accept(self, request, pk=None):
@@ -494,6 +497,7 @@ class InvitationViewSet(viewsets.ModelViewSet):
         # Update user's organization
         request.user.organization = invitation.organization
         request.user.save()
+        invitation.delete()
 
         return Response({"message": "Invitation accepted successfully"})
 
@@ -509,6 +513,7 @@ class InvitationViewSet(viewsets.ModelViewSet):
 
         invitation.status = 'declined'
         invitation.save()
+        invitation.delete()
 
         return Response({"message": "Invitation declined successfully"})
 

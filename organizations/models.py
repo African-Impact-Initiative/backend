@@ -83,3 +83,21 @@ class Organization(models.Model):
     challenge1 = models.CharField(max_length=2, choices=Challenges.CHOICES, null=True, blank=True)
     challenge2 = models.CharField(max_length=2, choices=Challenges.CHOICES, null=True, blank=True)
     challenge3 = models.CharField(max_length=2, choices=Challenges.CHOICES, null=True, blank=True)
+
+class JoinRequest(models.Model):
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('accepted', 'Accepted'),
+        ('declined', 'Declined'),
+    )
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['user', 'status']  # Ensures user can only have one pending request
+
+    def __str__(self):
+        return f"{self.user.email} -> {self.organization.name} ({self.status})"
