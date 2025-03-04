@@ -87,6 +87,25 @@ class ChangePasswordSerializer(serializers.Serializer):
 
         return value
 
+class ForgotPasswordSerializer(serializers.Serializer):
+    model = User
+    new_password = serializers.CharField(required=True)
+
+    # make sure new password complies with django basic requirements
+    def validate_new_password(self, value):
+        errors = dict()
+        try:
+            # validate the password and catch the exception
+            validators.validate_password(password=value)
+        # the exception raised here is different than serializers.ValidationError
+        except exceptions.ValidationError as e:
+            errors['password'] = list(e.messages)
+
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        return value
+
 # Used to change email
 class ChangeEmailSerializer(serializers.Serializer):
     model = User
