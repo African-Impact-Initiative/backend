@@ -12,6 +12,10 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 from oauth2_provider import settings as oauth2_settings
 from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+load_dotenv(".env")
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -60,6 +64,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "social_django.middleware.SocialAuthExceptionMiddleware",
 ]
 
 AUTHENTICATION_BACKENDS = (
@@ -94,6 +99,7 @@ if DEBUG:
         'https://127.0.0.1:3000',
         'http://127.0.0.1:8000'
     ]
+    # ALLOWED_HOSTS = ['testserver']
     CORS_ALLOW_ALL_ORIGINS = True
     CSRF_TRUSTED_ORIGINS = [
         'http://localhost:3000',
@@ -190,6 +196,8 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.SessionAuthentication",
         'oauth2_provider.contrib.rest_framework.OAuth2Authentication',  # social auth
         'drf_social_oauth2.authentication.SocialAuthentication',        # social auth
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticatedOrReadOnly"
@@ -205,5 +213,17 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'soccerblue20@gmail.com'
-EMAIL_HOST_PASSWORD = 'xfue qfvy zhkd voxo'
+EMAIL_HOST_USER = '' # Replace with email details that is used to send the verification email
+EMAIL_HOST_PASSWORD = '' # Replace with email details that is used to send the verification email
+
+# Required for the Google authentication login
+SOCIAL_AUTH_GOOGLE_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
+SOCIAL_AUTH_GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
+
+# Google OAuth
+GOOGLE_OAUTH_CLIENT_ID = os.getenv("SOCIAL_AUTH_GOOGLE_CLIENT_ID")
+GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("SOCIAL_AUTH_GOOGLE_CLIENT_SECRET")
+
+# Login redirect URL
+LOGIN_REDIRECT_URL = '/'
+SOCIAL_AUTH_REDIRECT_IS_HTTPS = True

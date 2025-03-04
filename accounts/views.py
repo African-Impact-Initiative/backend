@@ -6,18 +6,29 @@ from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import login as login
 from django.http import HttpResponseRedirect
 from django.conf import settings
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
+from django.contrib.auth.hashers import make_password
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+
+from rest_framework.views import APIView
+from rest_framework import status
+from social_django.utils import load_strategy
+from social_django.utils import load_backend
+from social_core.exceptions import MissingBackend, AuthException
+
 
 import json
 import os
 
 from .serializers import ChangeEmailSerializer, UserSerializer, GetUserSerializer, ChangePasswordSerializer, \
-    UpdatePersonalInfo, AddOrganization, TermsOfUseAgreement
+    UpdatePersonalInfo, AddOrganization, TermsOfUseAgreement, ForgotPasswordSerializer
 from .tokens import account_activation_token
 from venturebuild.mixins import UserMixin, SuperuserOrSelfMixin, AllowAll, StaffOnlyMixin
 
 from organizations.models import Organization
 
-from venturebuild.email_server import promote, demote, change_password, account_deleted, change_email, welcome_email
+from venturebuild.email_server import promote, demote, change_password, account_deleted, change_email, welcome_email, forgot_password
 
 from django.contrib.auth import get_user_model
 
@@ -403,18 +414,100 @@ def activate(request, uidb64, token):
 
     # verify user and token matches
     if user is not None and account_activation_token.check_token(user, token):
+        user.backend = 'django.contrib.auth.backends.ModelBackend'
         user.is_active = True  # account is now active
         user.is_verified = True  # account is now active
         user.save()
-        user.backend = 'django.contrib.auth.backends.ModelBackend'
 
+        # Potential error here as it does not log the user
+        # on the frontend, because once redirected to the
+        # onboarding page it shows the error that the
+        # user must be signed in to access that page
         login(request, user)
         print(f"Session data after login: {request.session}")
 
         # Redirect to the terms of use page after login
-        frontend_url = f'http://localhost:3000/onboarding/terms-of-use/'
+        # Right now it temporarily redirects the user
+        # back to the login in page using a hardcoded
+        # link for testing purposes. The correct
+        # flow is to autmatically login in the user
+        # and send them right to the onboarding page
+        # howevere, there was an issue that I was not
+        # able to resolve in terms of the logining the user
+        # as shown in the code above with login(request, user)
+        frontend_url = f'http://localhost:3000/login/'
         return HttpResponseRedirect(frontend_url)
     else:
         res = HttpResponse()
         res.status_code = 400
         return res
+
+class ForgotPasswordView(UserMixin, generics.UpdateAPIView):
+    model = User
+    def post(self, request):
+        email = request.data.get('email')
+        try:
+            user = User.objects.get(email=email)
+            token = PasswordResetTokenGenerator().make_token(user)
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            reset_link = f"http://frontend.com/password-reset-confirm?uid={uid}&token={token}" # Needs to be built out
+
+            # Send reset email
+            forgot_password(user,reset_link)
+            return Response({"message": "Password reset email sent."}, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({"error": "User with this email does not exist."}, status=status.HTTP_400_BAD_REQUEST)
+
+class ResetPasswordConfirmView(UserMixin, generics.UpdateAPIView):
+    # permission_classes = [AllowAny]
+    serializer_class = ChangePasswordSerializer
+    model = User
+
+    def update(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+
+        if serializer.is_valid():
+            # set_password also hashes the password that the user will get
+            self.object.set_password(serializer.data.get("new_password"))
+            self.object.save()
+
+            response = {
+                'status': 'success',
+                'code': status.HTTP_200_OK,
+                'message': 'Password updated successfully',
+                'data': []
+            }
+
+            # send email
+            change_password(self.object)
+
+            return Response(response)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@csrf_exempt
+class GoogleView(APIView):
+    def post(self, request):
+        """
+        Handles Google authentication using an access token.
+        """
+        token = request.data.get("token")
+        if not token:
+            return Response({"error": "Token is required"}, status=400)
+
+        strategy = load_strategy(request)
+        backend = load_backend(strategy, "google-oauth2", redirect_uri=None)
+
+        try:
+            user = backend.do_auth(token)
+        except AuthException as e:
+            return Response({"error": "Invalid token or authentication failed"}, status=400)
+
+        if user:
+            login(request, user)
+            return Response({"message": "Successfully authenticated", "user_id": user.id})
+        return Response({"error": "Authentication failed"}, status=400)
+
+
