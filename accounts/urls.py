@@ -1,7 +1,8 @@
-from django.urls import path
 
-from .views import ChangeEmailView, GetAdmins, GetUser, UserListCreateAPIView, UserViewUpdateDeleteAPIView, ChangePasswordView, TermsOfUseUpdate, AddOrganizationToUser, PersonInfoUpdate, UpdateTeamStatus, InvitationViewSet, ProcessInvitationView
+from django.urls import path, include
 
+from .views import ChangeEmailView, GetAdmins, GetUser, UserListCreateAPIView, UserViewUpdateDeleteAPIView, ChangePasswordView, TermsOfUseUpdate, AddOrganizationToUser, PersonInfoUpdate, UpdateTeamStatus, InvitationViewSet, ProcessInvitationView, activate, GoogleView
+print(GoogleView)
 urlpatterns = [
     path('', UserListCreateAPIView.as_view(), name='user-list'),
     path('me/', GetUser.as_view(), name='user-self'),
@@ -34,4 +35,7 @@ urlpatterns = [
     path('invitations/<int:pk>/decline/', InvitationViewSet.as_view({'post': 'decline'})),
     path('invitations/<int:pk>/withdraw/', InvitationViewSet.as_view({'post': 'withdraw'})),
     path('invitations/<int:pk>/resend/', InvitationViewSet.as_view({'post': 'resend'})),
+    path('activate/<slug:uidb64>/<slug:token>/', activate, name='activate'),
+    path('auth/google/login/', GoogleView, name='google-login'),
+    path('auth/google/', include('social_django.urls', namespace='social')),  # Google OAuth
 ]

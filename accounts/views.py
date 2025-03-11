@@ -12,27 +12,35 @@ from venturebuild.email_server import send_invitation_email
 from venturebuild import settings
 from datetime import timedelta
 from django.utils import timezone
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 from django.core.mail import send_mail
 from rest_framework.permissions import AllowAny
 from rest_framework.decorators import permission_classes
 from django.utils.crypto import get_random_string
-
-from .serializers import ChangeEmailSerializer, UserSerializer, GetUserSerializer, ChangePasswordSerializer, UpdatePersonalInfo, AddOrganization, TermsOfUseAgreement, UpdateTeamStatusSerializer
-# from .tokens import account_activation_token
+from django.contrib.auth import login as login
+from django.conf import settings
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
+from django.contrib.auth.hashers import make_password
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from social_django.utils import load_strategy
+from social_django.utils import load_backend
+from social_core.exceptions import MissingBackend, AuthException
+from .serializers import ChangeEmailSerializer, UserSerializer, GetUserSerializer, ChangePasswordSerializer, UpdatePersonalInfo, AddOrganization, TermsOfUseAgreement, UpdateTeamStatusSerializer, ForgotPasswordSerializer
+from .tokens import account_activation_token
 from venturebuild.mixins import UserMixin, SuperuserOrSelfMixin, AllowAll, StaffOnlyMixin
-
 from organizations.models import Organization
-
-# from venturebuild.email_server import promote, demote, change_password, account_deleted, change_email, welcome_email
-
+from venturebuild.email_server import promote, demote, change_password, account_deleted, change_email, welcome_email, forgot_password
 from django.contrib.auth import get_user_model
+from django.shortcuts import redirect
+
 User = get_user_model()
+
 
 # User general REST endpoint GET, POST
 class UserListCreateAPIView(AllowAll, UserMixin, generics.ListCreateAPIView):
     queryset = User.objects.all()
-    serializer_class = GetUserSerializer # Default class is the GET class
+    serializer_class = GetUserSerializer  # Default class is the GET class
 
     def perform_create(self, serializer):
         user = None
@@ -63,8 +71,10 @@ class UserListCreateAPIView(AllowAll, UserMixin, generics.ListCreateAPIView):
             )
 
         # account activation token
-        # token = account_activation_token.make_token(user)
+        token = account_activation_token.make_token(user)
         # welcome_email(user, f"{os.environ.get('FRONTEND_URL')}/activate/?id={user.id}&token={token}")
+        # For testing purposes
+        welcome_email(user, f"http://localhost:8000/api/accounts/activate/{user.id}/{token}")
 
     def create(self, request, *args, **kwargs):
         res = super().create(request, *args, **kwargs)
@@ -78,6 +88,7 @@ class UserListCreateAPIView(AllowAll, UserMixin, generics.ListCreateAPIView):
         if self.request.method == 'POST':
             return UserSerializer
         return GetUserSerializer
+
 
 # User REST /:id endpoint GET, PUT, DELETE
 class UserViewUpdateDeleteAPIView(UserMixin, SuperuserOrSelfMixin, generics.RetrieveUpdateDestroyAPIView):
@@ -95,20 +106,20 @@ class UserViewUpdateDeleteAPIView(UserMixin, SuperuserOrSelfMixin, generics.Retr
             staff = serializer.validated_data.get('staff', False)
             admin = serializer.validated_data.get('admin', False)
 
-            # # if admin status changed
-            # if admin != obj.admin:
-            #     sent = True
-            #     if admin:
-            #         promote(obj)
-            #     else:
-            #         demote(obj)
+            # if admin status changed
+            if admin != obj.admin:
+                sent = True
+                if admin:
+                    promote(obj)
+                else:
+                    demote(obj)
 
-            # # if staff status changed
-            # if staff != obj.staff and not sent:
-            #     if staff:
-            #         promote(obj)
-            #     else:
-            #         demote(obj)
+            # if staff status changed
+            if staff != obj.staff and not sent:
+                if staff:
+                    promote(obj)
+                else:
+                    demote(obj)
 
             # do not allow the admin to modify anything other that staff/admin status
             serializer.save(
@@ -129,7 +140,7 @@ class UserViewUpdateDeleteAPIView(UserMixin, SuperuserOrSelfMixin, generics.Retr
 
         if self.request.user.id == obj.id:
             # send email
-            # account_deleted(obj)
+            account_deleted(obj)
             return super().perform_destroy(instance)
 
     def destroy(self, request, *args, **kwargs):
@@ -140,7 +151,8 @@ class UserViewUpdateDeleteAPIView(UserMixin, SuperuserOrSelfMixin, generics.Retr
         if obj.has_usable_password() and not obj.check_password(request.data.get("password")):
             return Response({"password": ["Wrong password."]}, status=status.HTTP_400_BAD_REQUEST)
         if self.request.user.is_admin and self.request.user.id != obj.id:
-            return Response(status=status.HTTP_403_FORBIDDEN, data={'error': 'You cannot delete a user other than yourself'})
+            return Response(status=status.HTTP_403_FORBIDDEN,
+                            data={'error': 'You cannot delete a user other than yourself'})
         return super().destroy(request, *args, **kwargs)
 
     # Only allow PUT to the user serializer
@@ -148,6 +160,7 @@ class UserViewUpdateDeleteAPIView(UserMixin, SuperuserOrSelfMixin, generics.Retr
         if self.request.method == 'PUT':
             return UserSerializer
         return GetUserSerializer
+
 
 # on frontend it is tricky to find out who is logged in since admin can see multiple users (needed to promote/demote and site analytics)
 # to resolve this create /me endpoint which returns users associated with the token
@@ -159,6 +172,7 @@ class GetUser(UserMixin, generics.RetrieveAPIView):
     def get_serializer_class(self):
         return GetUserSerializer
 
+
 # returns all admins
 class GetAdmins(StaffOnlyMixin, generics.ListAPIView):
     def get_queryset(self):
@@ -166,6 +180,7 @@ class GetAdmins(StaffOnlyMixin, generics.ListAPIView):
 
     def get_serializer_class(self):
         return GetUserSerializer
+
 
 # used to change password
 class ChangePasswordView(UserMixin, generics.UpdateAPIView):
@@ -197,11 +212,12 @@ class ChangePasswordView(UserMixin, generics.UpdateAPIView):
             }
 
             # send email
-            # change_password(self.object)
+            change_password(self.object)
 
             return Response(response)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class ChangeEmailView(UserMixin, generics.UpdateAPIView):
     serializer_class = ChangeEmailSerializer
@@ -236,7 +252,7 @@ class ChangeEmailView(UserMixin, generics.UpdateAPIView):
                 }
 
                 # send email
-                # change_email(user)
+                change_email(user)
 
                 return Response(response)
 
@@ -306,6 +322,7 @@ class PersonInfoUpdate(UserMixin, generics.UpdateAPIView):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 class TermsOfUseUpdate(UserMixin, generics.UpdateAPIView):
     serializer_class = TermsOfUseAgreement
     model = User
@@ -344,6 +361,7 @@ class TermsOfUseUpdate(UserMixin, generics.UpdateAPIView):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 class AddOrganizationToUser(UserMixin, generics.UpdateAPIView):
     serializer_class = AddOrganization
     model = User
@@ -376,11 +394,11 @@ class AddOrganizationToUser(UserMixin, generics.UpdateAPIView):
             user.save()
 
             response = {
-                    'status': 'success',
-                    'code': status.HTTP_200_OK,
-                    'message': 'Organization added',
-                    'data': []
-                }
+                'status': 'success',
+                'code': status.HTTP_200_OK,
+                'message': 'Organization added',
+                'data': []
+            }
 
             return Response(response)
 
@@ -685,25 +703,110 @@ class ProcessInvitationView(APIView):
 
 
 # for some reason need csrf exempt for the function idk why though CORS should have handled this
-# @csrf_exempt
-# def activate(request, uidb64, token):
-#     # get user
-#     try:
-#         user = User.objects.get(pk=uidb64)
-#     except(TypeError, ValueError, OverflowError, User.DoesNotExist):
-#         user = None
+@csrf_exempt
+def activate(request, uidb64, token):
+    # get user
+    try:
+        user = User.objects.get(pk=uidb64)
+    except(TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
 
-#     # verify user and token matches
-#     if user is not None and account_activation_token.check_token(user, token):
-#         user.is_active = True   # account is now active
-#         user.is_verified = True   # account is now active
-#         user.save()
+    # verify user and token matches
+    if user is not None and account_activation_token.check_token(user, token):
+        user.backend = 'django.contrib.auth.backends.ModelBackend'
+        user.is_active = True  # account is now active
+        user.is_verified = True  # account is now active
+        user.save()
 
-#         res = HttpResponse()
-#         res.status_code = 200
+        # Potential error here as it does not log the user
+        # on the frontend, because once redirected to the
+        # onboarding page it shows the error that the
+        # user must be signed in to access that page
+        login(request, user)
+        print(f"Session data after login: {request.session}")
 
-#         return res
-#     else:
-#         res = HttpResponse()
-#         res.status_code = 400
-#         return res
+        # Redirect to the terms of use page after login
+        # Right now it temporarily redirects the user
+        # back to the login in page using a hardcoded
+        # link for testing purposes. The correct
+        # flow is to autmatically login in the user
+        # and send them right to the onboarding page
+        # howevere, there was an issue that I was not
+        # able to resolve in terms of the logining the user
+        # as shown in the code above with login(request, user)
+        frontend_url = f'http://localhost:3000/login/'
+        return HttpResponseRedirect(frontend_url)
+    else:
+        res = HttpResponse()
+        res.status_code = 400
+        return res
+
+class ForgotPasswordView(UserMixin, generics.UpdateAPIView):
+    model = User
+    def post(self, request):
+        email = request.data.get('email')
+        try:
+            user = User.objects.get(email=email)
+            token = PasswordResetTokenGenerator().make_token(user)
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            reset_link = f"http://frontend.com/password-reset-confirm?uid={uid}&token={token}" # Needs to be built out
+
+            # Send reset email
+            forgot_password(user,reset_link)
+            return Response({"message": "Password reset email sent."}, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({"error": "User with this email does not exist."}, status=status.HTTP_400_BAD_REQUEST)
+
+class ResetPasswordConfirmView(UserMixin, generics.UpdateAPIView):
+    # permission_classes = [AllowAny]
+    serializer_class = ChangePasswordSerializer
+    model = User
+
+    def update(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+
+        if serializer.is_valid():
+            # set_password also hashes the password that the user will get
+            self.object.set_password(serializer.data.get("new_password"))
+            self.object.save()
+
+            response = {
+                'status': 'success',
+                'code': status.HTTP_200_OK,
+                'message': 'Password updated successfully',
+                'data': []
+            }
+
+            # send email
+            change_password(self.object)
+
+            return Response(response)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@csrf_exempt
+class GoogleView(APIView):
+    def post(self, request):
+        """
+        Handles Google authentication using an access token.
+        """
+        token = request.data.get("token")
+        if not token:
+            return Response({"error": "Token is required"}, status=400)
+
+        strategy = load_strategy(request)
+        backend = load_backend(strategy, "google-oauth2", redirect_uri=None)
+
+        try:
+            user = backend.do_auth(token)
+        except AuthException as e:
+            return Response({"error": "Invalid token or authentication failed"}, status=400)
+
+        if user:
+            login(request, user)
+            return Response({"message": "Successfully authenticated", "user_id": user.id})
+        return Response({"error": "Authentication failed"}, status=400)
+
+

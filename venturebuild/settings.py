@@ -12,6 +12,10 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 from oauth2_provider import settings as oauth2_settings
 from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+load_dotenv(".env")
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,9 +29,6 @@ SECRET_KEY = "django-insecure-ws5bdbb0oyh#-(r4&sbw#!c+ephe2n^a5ws53mc7i%molu6peg
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
-
-ALLOWED_HOSTS = []
-
 
 # Application definition
 
@@ -63,6 +64,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "social_django.middleware.SocialAuthExceptionMiddleware",
 ]
 
 AUTHENTICATION_BACKENDS = (
@@ -98,6 +100,7 @@ if DEBUG:
         'https://127.0.0.1:3000',
         'http://127.0.0.1:8000'
     ]
+    # ALLOWED_HOSTS = ['testserver']
     CORS_ALLOW_ALL_ORIGINS = True
     CSRF_TRUSTED_ORIGINS = [
         'http://localhost:3000',
@@ -106,6 +109,12 @@ if DEBUG:
         'https://127.0.0.1:3000',
         'http://127.0.0.1:8000'
     ]
+    SESSION_COOKIE_SAMESITE = 'None'  # Required for cross-domain cookies
+    SESSION_COOKIE_SECURE = False
+    SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+    CORS_ALLOW_CREDENTIALS = True
+    CSRF_COOKIE_SAMESITE = 'None'
+    CSRF_COOKIE_SECURE = False
 else:
     CORS_ALLOWED_ORIGINS += [
         'http://127.0.0.1:8000'
@@ -114,7 +123,10 @@ else:
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / 'venturebuild' / 'templates'],
+        "DIRS": [
+          BASE_DIR / 'venturebuild' / 'templates',
+          'venturebuild/templates/venturebuild',
+        ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -188,6 +200,8 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.SessionAuthentication",
         'oauth2_provider.contrib.rest_framework.OAuth2Authentication',  # social auth
         'drf_social_oauth2.authentication.SocialAuthentication',        # social auth
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticatedOrReadOnly"
@@ -208,3 +222,15 @@ EMAIL_PORT = 587
 EMAIL_HOST_USER = 'testafricanteam@gmail.com'  
 EMAIL_HOST_PASSWORD = 'hvuw gayp emik sdwj'  
 FRONTEND_URL = 'http://localhost:3000'
+
+# Required for the Google authentication login
+SOCIAL_AUTH_GOOGLE_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
+SOCIAL_AUTH_GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
+
+# Google OAuth
+GOOGLE_OAUTH_CLIENT_ID = os.getenv("SOCIAL_AUTH_GOOGLE_CLIENT_ID")
+GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("SOCIAL_AUTH_GOOGLE_CLIENT_SECRET")
+
+# Login redirect URL
+LOGIN_REDIRECT_URL = '/'
+SOCIAL_AUTH_REDIRECT_IS_HTTPS = True
