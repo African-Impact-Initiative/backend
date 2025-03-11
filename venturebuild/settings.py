@@ -76,6 +76,7 @@ AUTHENTICATION_BACKENDS = (
 
     # Django
     'django.contrib.auth.backends.ModelBackend',
+    
 )
 
 ACTIVATE_JWT = True
@@ -122,7 +123,10 @@ else:
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": ['venturebuild/templates/venturebuild',],
+        "DIRS": [
+          BASE_DIR / 'venturebuild' / 'templates',
+          'venturebuild/templates/venturebuild',
+        ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -209,12 +213,15 @@ REST_FRAMEWORK = {
 LOGOS_ROOT = BASE_DIR / 'logos'
 PHOTOS_ROOT = BASE_DIR / 'photos'
 
+
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = '' # Replace with email details that is used to send the verification email
-EMAIL_HOST_PASSWORD = '' # Replace with email details that is used to send the verification email
+EMAIL_USE_SSL = False
+EMAIL_PORT = 587
+EMAIL_HOST_USER = 'testafricanteam@gmail.com'  
+EMAIL_HOST_PASSWORD = 'hvuw gayp emik sdwj'  
+FRONTEND_URL = 'http://localhost:3000'
 
 # Required for the Google authentication login
 SOCIAL_AUTH_GOOGLE_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID")

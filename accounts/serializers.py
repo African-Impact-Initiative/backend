@@ -6,7 +6,7 @@ from django_countries.serializer_fields import CountryField
 from taggit.serializers import (TagListSerializerField, TaggitSerializer)
 
 from organizations.models import Organization
-
+from .models import Invitation
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
@@ -23,10 +23,13 @@ class GetUserSerializer(TaggitSerializer, serializers.ModelSerializer):
 # Only allow id, email, name
 class UserPublicSerializer(TaggitSerializer, serializers.ModelSerializer):
     team = TagListSerializerField(required=False)
+    country = CountryField(name_only=True, required=True) 
+    role = serializers.CharField(required=True)
+    team_status = serializers.ChoiceField(choices=User.TEAM_STATUS_CHOICES, required=True)
 
     class Meta:
         model = User
-        fields = ['id', 'first_name', 'last_name', 'email', 'photo', 'role', 'leadership', 'team']
+        fields = ['id', 'first_name', 'last_name', 'email', 'photo', 'role', 'leadership', 'team', 'country', 'team_status', 'owner', 'coowner', 'joined']
 
 #! Danger never allow GET on this serializer user can see password
 class UserSerializer(TaggitSerializer, serializers.ModelSerializer):
@@ -167,10 +170,11 @@ class UpdatePersonalInfo(serializers.Serializer):
     first_name = serializers.CharField(required=True)
     last_name = serializers.CharField(required=True)
     role = serializers.CharField(required=True)
+    team_status = serializers.ChoiceField(choices=User.TEAM_STATUS_CHOICES, required=False)
 
     linkedin = serializers.URLField(required=False, allow_blank=True)
     photo = Base64ImageField(required=False)
-    country = CountryField(name_only=True, required=False, allow_null=True)
+    country = CountryField(required=False, allow_null=True)
     bio = serializers.CharField(required=False, allow_blank=True)
 
 # Used to agree to terms
@@ -183,4 +187,18 @@ class AddOrganization(serializers.Serializer):
     model = User
     org = serializers.PrimaryKeyRelatedField(queryset=Organization.objects.all())
 
+class UpdateTeamStatusSerializer(serializers.Serializer):
+    model = User
+    team_status = serializers.ChoiceField(choices=User.TEAM_STATUS_CHOICES, required=True)
 
+
+class InvitationSerializer(serializers.ModelSerializer):
+    organization_name = serializers.CharField(source='organization.name', read_only=True)
+    invited_by_name = serializers.CharField(source='invited_by.get_full_name', read_only=True)
+    invited_by_email = serializers.CharField(source='invited_by.email', read_only=True)
+    class Meta:
+        model = Invitation
+        fields = ['id', 'email', 'organization', 'organization_name', 
+                 'invited_by', 'invited_by_name', 'invited_by_email',
+                 'status', 'created_at', 'token']
+        read_only_fields = ['invited_by', 'status', 'created_at', 'token']
