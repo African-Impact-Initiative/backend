@@ -12,7 +12,7 @@ urlpatterns = [
     path('onboarding/terms/', TermsOfUseUpdate.as_view(), name='terms'),
     path('onboarding/personal-info/', PersonInfoUpdate.as_view(), name='personal-info'),
     path('onboarding/add-organization/', AddOrganizationToUser.as_view(), name='add-organization'),
-    path('activate/<slug:uidb64>/<slug:token>/', activate, name='activate'),
+    path('activate/', activate, name='activate'),
     path('auth/google/login/', GoogleView, name='google-login'),
     path('auth/google/', include('social_django.urls', namespace='social')),  # Google OAuth
 ]
