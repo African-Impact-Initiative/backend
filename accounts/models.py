@@ -102,7 +102,26 @@ class User(AbstractBaseUser):
     team = TaggableManager(blank=True)
 
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, blank=True, null=True, default=None)
+    # Add the team status field with choices
+    TEAM_STATUS_CHOICES = [
+        ('ACTIVE', 'Active'),
+        ('VACATION', 'Vacation'), 
+        ('LEAVE', 'Leave')
+    ]
 
+     # Add the coowner field
+    coowner = models.IntegerField(
+        null=True, 
+        blank=True,
+        help_text="Organization ID that the user co-owns"
+    )
+    
+    team_status = models.CharField(
+        max_length=10,
+        choices=TEAM_STATUS_CHOICES,
+        default='ACTIVE',
+        help_text='Current status of the user in their organization team'
+    )
     # Users email will be used as username
     USERNAME_FIELD = 'email'
     # Note password and email not included, it is automatically mandatory by Django
@@ -130,6 +149,23 @@ class User(AbstractBaseUser):
     @property
     def is_admin(self):
         return self.admin
+
+class Invitation(models.Model):
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('accepted', 'Accepted'),
+        ('declined', 'Declined'),
+    )
+
+    email = models.EmailField()
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    invited_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_invitations')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    token = models.CharField(max_length=100, unique=True)
+
+    class Meta:
+        unique_together = ['email', 'organization', 'status']
 
 # when password reset token is created this function will run
 # @receiver(reset_password_token_created)

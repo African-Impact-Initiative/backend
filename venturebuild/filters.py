@@ -13,7 +13,7 @@ File contains custom filters used across the whole backend API
 class FilterOrgsToUser(filters.BaseFilterBackend):
     def filter_queryset(self, request, queryset, view):
         user = request.user
-
+        print(f"Here is {user}")
         try:
             user = User.objects.get(id=request.user.id)
         except User.DoesNotExist:

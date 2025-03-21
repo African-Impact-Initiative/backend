@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Organization
+from .models import Organization, JoinRequest
 from accounts.serializers import UserPublicSerializer
 from django_countries.serializer_fields import CountryField
 from taggit.serializers import (TagListSerializerField, TaggitSerializer)
@@ -60,3 +60,9 @@ class AddFundingSerializer(serializers.Serializer):
 class AddStageSerializer(serializers.Serializer):
     model = Organization
     stage = serializers.ChoiceField(choices=Organization.Stages.CHOICES)
+
+class JoinRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = JoinRequest
+        fields = ['id', 'user', 'organization', 'status', 'created_at']
+        read_only_fields = ['user', 'status', 'created_at']

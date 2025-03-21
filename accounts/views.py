@@ -1,18 +1,28 @@
-from rest_framework import generics, status
+from django.shortcuts import get_object_or_404
+from rest_framework import viewsets, generics, status
 from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.decorators import action, api_view
 from django.contrib.contenttypes.models import ContentType
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
+from .models import Invitation
+from .serializers import InvitationSerializer
+from venturebuild.email_server import send_invitation_email
+from venturebuild import settings
+from datetime import timedelta
+from django.utils import timezone
+from django.http import HttpResponse, HttpResponseRedirect
+from django.core.mail import send_mail
+from rest_framework.permissions import AllowAny
+from rest_framework.decorators import permission_classes
+from django.utils.crypto import get_random_string
 from django.contrib.auth import login as login
-from django.http import HttpResponseRedirect
 from django.conf import settings
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.contrib.auth.hashers import make_password
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-
-from rest_framework.views import APIView
-from rest_framework import status
 from social_django.utils import load_strategy
 from social_django.utils import load_backend
 from social_core.exceptions import MissingBackend, AuthException
@@ -22,16 +32,16 @@ import os
 
 from .serializers import ChangeEmailSerializer, UserSerializer, GetUserSerializer, ChangePasswordSerializer, \
     UpdatePersonalInfo, AddOrganization, TermsOfUseAgreement, ForgotPasswordSerializer
+from .serializers import ChangeEmailSerializer, UserSerializer, GetUserSerializer, ChangePasswordSerializer, UpdatePersonalInfo, AddOrganization, TermsOfUseAgreement, UpdateTeamStatusSerializer, ForgotPasswordSerializer
 from .tokens import account_activation_token
 from venturebuild.mixins import UserMixin, SuperuserOrSelfMixin, AllowAll, StaffOnlyMixin
-
 from organizations.models import Organization
 
 from venturebuild.email_server import promote, demote, change_password, account_deleted, change_email, welcome_email, \
     forgot_password
 
+from venturebuild.email_server import promote, demote, change_password, account_deleted, change_email, welcome_email, forgot_password
 from django.contrib.auth import get_user_model
-
 from django.shortcuts import redirect
 
 User = get_user_model()
@@ -197,7 +207,6 @@ class ChangePasswordView(UserMixin, generics.UpdateAPIView):
     def update(self, request, *args, **kwargs):
         self.object = self.get_object()
         serializer = self.get_serializer(data=request.data)
-
         if serializer.is_valid():
             # Check old password
             if self.object.password != None and not self.object.check_password(serializer.data.get("old_password")):
@@ -279,7 +288,7 @@ class PersonInfoUpdate(UserMixin, generics.UpdateAPIView):
         self.object = self.get_object()
         serializer = self.get_serializer(data=request.data)
         user = User.objects.get(id=self.object.id)
-
+        print(serializer)
         if serializer.is_valid():
             if not user.terms_of_use:
                 # build this response
@@ -296,6 +305,9 @@ class PersonInfoUpdate(UserMixin, generics.UpdateAPIView):
             user.last_name = serializer.data.get("last_name")
             user.role = serializer.data.get("role")
 
+            # Add team_status update
+            if serializer.data.get("team_status"):
+                user.team_status = serializer.data.get("team_status")
             if request.FILES.get("photo", False):
                 user.photo = request.FILES.get("photo")
 
@@ -403,6 +415,303 @@ class AddOrganizationToUser(UserMixin, generics.UpdateAPIView):
             return Response(response)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
+# Add new view for updating team status
+class UpdateTeamStatus(UserMixin, generics.UpdateAPIView):
+    serializer_class = UpdateTeamStatusSerializer
+    model = User
+
+    def get_object(self, queryset=None):
+        obj = self.request.user
+        return obj
+
+    def update(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+
+        if serializer.is_valid():
+            user = User.objects.get(id=self.object.id)
+            user.team_status = serializer.data.get("team_status")
+            user.save()
+
+            response = {
+                'status': 'success',
+                'code': status.HTTP_200_OK,
+                'message': 'Team status updated successfully',
+                'data': {
+                    'team_status': user.team_status
+                }
+            }
+
+            return Response(response)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class InvitationViewSet(viewsets.ModelViewSet):
+    queryset = Invitation.objects.all()
+    serializer_class = InvitationSerializer
+
+    def create(self, request, *args, **kwargs):
+        # Get the organization
+        organization_id = request.data.get('organization')
+        organization = get_object_or_404(Organization, id=organization_id)
+        
+        # Check if user has permission to invite (must be owner or co-owner)
+        if not (request.user.owner and request.user.organization.id == organization_id) and \
+           not (request.user.coowner == organization_id):
+            return Response(
+                {"error": "You don't have permission to invite members to this organization"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Check if there's a pending invitation for this email
+        email = request.data.get('email')
+        if Invitation.objects.filter(email=email, organization=organization, status='pending').exists():
+            return Response(
+                {"error": "A pending invitation already exists for this email"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check if user is already a member of the organization
+        User = get_user_model()
+        if User.objects.filter(email=email, organization=organization).exists():
+            return Response(
+                {"error": "This user is already a member of your organization"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Generate unique token
+        token = get_random_string(64)
+        
+        # Create invitation
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        invitation = serializer.save(invited_by=request.user, token=token)
+
+        # Generate invitation link
+        invitation_link = f"{settings.FRONTEND_URL}/join-organization/{token}"
+        # Send invitation email
+        try:
+            send_invitation_email(
+                invitation.email,
+                organization.name,
+                invitation_link
+            )
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            import traceback
+            print(traceback.format_exc())
+            invitation.delete()
+            return Response(
+                {"error": f"Failed to send invitation email: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+    @action(detail=True, methods=['post'])
+    def accept(self, request, pk=None):
+        invitation = self.get_object()
+        
+        if invitation.status != 'pending':
+            return Response(
+                {"error": "This invitation has already been processed"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Update invitation status
+        invitation.status = 'accepted'
+        invitation.save()
+
+        # Update user's organization
+        request.user.organization = invitation.organization
+        request.user.save()
+        invitation.delete()
+
+        return Response({"message": "Invitation accepted successfully"})
+
+    @action(detail=True, methods=['post'])
+    def decline(self, request, pk=None):
+        invitation = self.get_object()
+        
+        if invitation.status != 'pending':
+            return Response(
+                {"error": "This invitation has already been processed"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        invitation.status = 'declined'
+        invitation.save()
+        invitation.delete()
+
+        return Response({"message": "Invitation declined successfully"})
+
+    @action(detail=True, methods=['post'])
+    def withdraw(self, request, pk=None):
+        invitation = self.get_object()
+        
+        # Check if user has permission to withdraw (must be owner or co-owner)
+        if not (request.user.owner and request.user.organization.id == invitation.organization.id) and \
+        not (request.user.coowner == invitation.organization.id):
+            return Response(
+                {"error": "You don't have permission to withdraw this invitation"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if invitation.status != 'pending':
+            return Response(
+                {"error": "This invitation has already been processed"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Instead of updating status, just delete the invitation
+        invitation.delete()
+
+        return Response({"message": "Invitation withdrawn successfully"})
+
+    @action(detail=True, methods=['post'])
+    def resend(self, request, pk=None):
+        invitation = self.get_object()
+        
+        # Check if user has permission to resend (must be owner or co-owner)
+        if not (request.user.owner and request.user.organization.id == invitation.organization.id) and \
+        not (request.user.coowner == invitation.organization.id):
+            return Response(
+                {"error": "You don't have permission to resend this invitation"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Generate new token
+        token = get_random_string(64)
+        invitation.token = token
+        invitation.created_at = timezone.now()
+        invitation.status = 'pending'
+        invitation.save()
+
+        # Generate new invitation link
+        invitation_link = f"{settings.FRONTEND_URL}/join-organization/{token}"
+        
+        try:
+            send_invitation_email(
+                invitation.email,
+                invitation.organization.name,
+                invitation_link
+            )
+            return Response({"message": "Invitation resent successfully"})
+        except Exception as e:
+            return Response(
+                {"error": "Failed to resend invitation email"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+@permission_classes([AllowAny])
+class ProcessInvitationView(APIView):
+    def get(self, request, token):
+        """Verify if invitation token is valid"""
+        try:
+            # Find invitation by token
+            invitation = Invitation.objects.get(token=token)
+            
+            # Check if invitation is still pending
+            if invitation.status != 'pending':
+                return Response({
+                    'status': 'error',
+                    'message': 'This invitation has already been processed'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if invitation is expired (7 days)
+            if invitation.created_at < timezone.now() - timedelta(days=7):
+                return Response({
+                    'status': 'error',
+                    'message': 'This invitation has expired'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            return Response({
+                'status': 'success',
+                'organization_name': invitation.organization.name,
+                'email': invitation.email
+            })
+            
+        except Invitation.DoesNotExist:
+            return Response({
+                'status': 'error',
+                'message': 'Invalid invitation token'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+    def post(self, request, token):
+        """Accept or decline invitation"""
+        try:
+            invitation = Invitation.objects.get(token=token)
+            action = request.data.get('action')
+            if invitation.status != 'pending':
+                return Response({
+                    'status': 'error',
+                    'message': 'This invitation has already been processed'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if invitation is expired
+            if invitation.created_at < timezone.now() - timedelta(days=7):
+                return Response({
+                    'status': 'error',
+                    'message': 'This invitation has expired'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            try:
+                # Try to find existing user with the invitation email
+                user = User.objects.get(email=invitation.email)
+            except User.DoesNotExist:
+                if action == 'accept':
+                    return Response({
+                        'status': 'error',
+                        'message': 'Please create an account first with the invited email',
+                        'need_signup': True,
+                        'email': invitation.email
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    # Delete declined invitation
+                    invitation.delete()
+                    return Response({
+                        'status': 'success',
+                        'message': 'Invitation declined successfully'
+                    })
+            
+            if action == 'accept':
+                # Update invitation status
+                invitation.status = 'accepted'
+                invitation.save()
+                
+                # Update user's organization
+                user.organization = invitation.organization
+                user.save()
+                # Delete accepted invitation
+                invitation.delete()
+                
+                return Response({
+                    'status': 'success',
+                    'message': 'Invitation accepted successfully'
+                })
+                
+            elif action == 'decline':
+                # Delete declined invitation
+                invitation.delete()
+                
+                return Response({
+                    'status': 'success',
+                    'message': 'Invitation declined successfully'
+                })
+                
+            else:
+                return Response({
+                    'status': 'error',
+                    'message': 'Invalid action'
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Invitation.DoesNotExist:
+            return Response({
+                'status': 'error',
+                'message': 'Invalid invitation token'
+            }, status=status.HTTP_404_NOT_FOUND)
 
 
 # for some reason need csrf exempt for the function idk why though CORS should have handled this
