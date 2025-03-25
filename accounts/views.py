@@ -26,10 +26,20 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from social_django.utils import load_strategy
 from social_django.utils import load_backend
 from social_core.exceptions import MissingBackend, AuthException
+
+import json
+import os
+
+from .serializers import ChangeEmailSerializer, UserSerializer, GetUserSerializer, ChangePasswordSerializer, \
+    UpdatePersonalInfo, AddOrganization, TermsOfUseAgreement, ForgotPasswordSerializer
 from .serializers import ChangeEmailSerializer, UserSerializer, GetUserSerializer, ChangePasswordSerializer, UpdatePersonalInfo, AddOrganization, TermsOfUseAgreement, UpdateTeamStatusSerializer, ForgotPasswordSerializer
 from .tokens import account_activation_token
 from venturebuild.mixins import UserMixin, SuperuserOrSelfMixin, AllowAll, StaffOnlyMixin
 from organizations.models import Organization
+
+from venturebuild.email_server import promote, demote, change_password, account_deleted, change_email, welcome_email, \
+    forgot_password
+
 from venturebuild.email_server import promote, demote, change_password, account_deleted, change_email, welcome_email, forgot_password
 from django.contrib.auth import get_user_model
 from django.shortcuts import redirect
@@ -73,8 +83,10 @@ class UserListCreateAPIView(AllowAll, UserMixin, generics.ListCreateAPIView):
         # account activation token
         token = account_activation_token.make_token(user)
         # welcome_email(user, f"{os.environ.get('FRONTEND_URL')}/activate/?id={user.id}&token={token}")
-        # For testing purposes
-        welcome_email(user, f"http://localhost:8000/api/accounts/activate/{user.id}/{token}")
+        # Need to edit the frontend link such that it is dynamic and
+        # reflects the actual frontend url. The current link has been hardcoded just as a placeholder and for testing
+        # purposes
+        welcome_email(user, f"http://localhost:8000/api/accounts/activate/?id={user.id}&token={token}")
 
     def create(self, request, *args, **kwargs):
         res = super().create(request, *args, **kwargs)
@@ -703,11 +715,18 @@ class ProcessInvitationView(APIView):
 
 
 # for some reason need csrf exempt for the function idk why though CORS should have handled this
+# Endpoint for verifying a user on the backend. Once a user has signed up on the VB website,
+# An email will be sent for them to verify the account. Once sent the user clicks on the verify
+# button which then goes through this endpoint to verify the user's account on the backend.
+# This is done by setting the is_active and is_verified boolean variables for that user to be
+# true. The designated the flow is that once clicked on verified it should take the user to the
+# onboarding page. However, there was an issue with that as described in the code below.
 @csrf_exempt
-def activate(request, uidb64, token):
+def activate(request):
     # get user
     try:
-        user = User.objects.get(pk=uidb64)
+        user = User.objects.get(pk=request.GET.get('id'))
+        token = request.GET.get('token')
     except(TypeError, ValueError, OverflowError, User.DoesNotExist):
         user = None
 
@@ -725,38 +744,58 @@ def activate(request, uidb64, token):
         login(request, user)
         print(f"Session data after login: {request.session}")
 
-        # Redirect to the terms of use page after login
-        # Right now it temporarily redirects the user
+        # Expected action: Redirect to the terms of use page after login
+        # Current action: Right now it temporarily redirects the user
         # back to the login in page using a hardcoded
         # link for testing purposes. The correct
-        # flow is to autmatically login in the user
+        # flow is to automatically login in the user
         # and send them right to the onboarding page
-        # howevere, there was an issue that I was not
+        # however, there was an issue that I was not
         # able to resolve in terms of the logining the user
         # as shown in the code above with login(request, user)
-        frontend_url = f'http://localhost:3000/login/'
+
+        frontend_url = f'http://localhost:3000/login/' # Need to edit the frontend link such that it is dynamic and
+        # reflects the actual frontend url. The current link has been hardcoded just as a placeholder and for testing
+        # purposes
         return HttpResponseRedirect(frontend_url)
     else:
         res = HttpResponse()
         res.status_code = 400
         return res
 
+# Endpoint for reset password feature. This endpoint first used to the user an email,
+# when they click on reset password on the front end. The email sent should contain another link to the actual
+# page where the user can change their password. This endpoint is responsible for handling
+# sending the email to the user and generating a unique token for security reasons
+# ensuring the user gets a unique link to change their password. More details about this
+# feature can be found here: https://docs.google.com/document/d/1yqCskeGixRoKEdxTHuHCmpTBfRlyfvntqPaIJDkFFu0/edit?usp=sharing
 class ForgotPasswordView(UserMixin, generics.UpdateAPIView):
     model = User
+
     def post(self, request):
         email = request.data.get('email')
         try:
             user = User.objects.get(email=email)
             token = PasswordResetTokenGenerator().make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
-            reset_link = f"http://frontend.com/password-reset-confirm?uid={uid}&token={token}" # Needs to be built out
+
+            # Need to edit the frontend link such that it is dynamic and reflects the actual frontend url
+            # The current link has been hardcoded just as a placeholder and for testing purposes
+            reset_link = f"http://frontend.com/password-reset-confirm?uid={uid}&token={token}"  # Needs to be built out on the frontend
 
             # Send reset email
-            forgot_password(user,reset_link)
+            forgot_password(user, reset_link)
             return Response({"message": "Password reset email sent."}, status=status.HTTP_200_OK)
         except User.DoesNotExist:
             return Response({"error": "User with this email does not exist."}, status=status.HTTP_400_BAD_REQUEST)
 
+# Endpoint for reset password feature. This endpoint handles updating the user's password
+# on the backend. However, before the password is saved on the backend, it is hashed to
+# ensure the integrity of the password is maintained. Once again, once the password
+# has successfully been changed, a confirmation email is sent to the user notifying
+# them of this.
+# More details about this feature can be found here:
+# https://docs.google.com/document/d/1yqCskeGixRoKEdxTHuHCmpTBfRlyfvntqPaIJDkFFu0/edit?usp=sharing
 class ResetPasswordConfirmView(UserMixin, generics.UpdateAPIView):
     # permission_classes = [AllowAny]
     serializer_class = ChangePasswordSerializer
@@ -778,7 +817,8 @@ class ResetPasswordConfirmView(UserMixin, generics.UpdateAPIView):
                 'data': []
             }
 
-            # send email
+            # send email --> This also needs to be built out on the frontend. There is no html page
+            # That reflects/corresponds to the succeful password has been changed message for the user
             change_password(self.object)
 
             return Response(response)
@@ -786,13 +826,17 @@ class ResetPasswordConfirmView(UserMixin, generics.UpdateAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+# Endpoint for the Google authentication and signup. This code extracts the authentication token from the URL,
+# and then it authenticates that user on the backend. Once a user has been authenticated it logs them in on the
+# backend (of course while sending the appropriate error messages). More detials about this feature can be found
+# here: https://docs.google.com/document/d/1W-ZApjaZ75lwFNFrK60pI5l6vaya1cxsBZDWYaKRsVs/edit?usp=sharing
 @csrf_exempt
 class GoogleView(APIView):
     def post(self, request):
         """
         Handles Google authentication using an access token.
         """
-        token = request.data.get("token")
+        token = request.GET.get("token")
         if not token:
             return Response({"error": "Token is required"}, status=400)
 
@@ -808,5 +852,3 @@ class GoogleView(APIView):
             login(request, user)
             return Response({"message": "Successfully authenticated", "user_id": user.id})
         return Response({"error": "Authentication failed"}, status=400)
-
-

@@ -13,6 +13,7 @@ urlpatterns = [
     path('onboarding/terms/', TermsOfUseUpdate.as_view(), name='terms'),
     path('onboarding/personal-info/', PersonInfoUpdate.as_view(), name='personal-info'),
     path('onboarding/add-organization/', AddOrganizationToUser.as_view(), name='add-organization'),
+    path('activate/', activate, name='activate'),
     path('users/team-status/', UpdateTeamStatus.as_view(), name='update-team-status'),
     # path('activate/<slug:uidb64>/<slug:token>/', activate, name='activate'),
     # Invitation URLs

@@ -166,8 +166,9 @@ class UserTeamStatusAPITests(APITestCase):
 
 # The following tests are for Google login functionality.
 # Uncomment additional tests as needed.
-
 class GoogleLoginViewTests(TestCase):
+    # This sets up the mock data and environment used for conducting the Google auth test
+    # cases.
     def setUp(self):
         # Initialize the test client
         self.client = APIClient()
@@ -181,6 +182,9 @@ class GoogleLoginViewTests(TestCase):
             "name": "Test User",
         }
 
+    # This test cases for when an invalid token has been sent to the backend for the Google authentication.
+    # The main purpose of this is to test whether the endpoint is being called properly. The expected output
+    # Should be a 400 error
     @patch('social_django.utils.load_backend')
     @patch('social_django.utils.load_strategy')
     @override_settings(ALLOWED_HOSTS=['testserver'])
